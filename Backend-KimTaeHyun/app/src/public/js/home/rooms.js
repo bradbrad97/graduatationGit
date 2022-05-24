@@ -21,6 +21,8 @@ let myPeerConnection;
 let peopleInRoom = 1;
 let auth = "";
 let schoolid = "";
+let path1 = "";
+let path2 = "";
 
 let pcObj = {
 
@@ -47,7 +49,7 @@ async function getCameras(){
     }
 }
 
-// 오디오와 비디오를 가져오는 함수 
+// 오디오와 비디오를 가져오는 함수
 
 async function getMedia(deviceId){
     const initialConstrains = {
@@ -66,7 +68,7 @@ async function getMedia(deviceId){
         if(!deviceId){
             await getCameras();
         }
-        
+
     } catch(e){
         console.log(e);
     }
@@ -102,72 +104,72 @@ function handleCameraClick() {
 // 캡쳐
 
 const dataURLtoFile = (dataurl, fileName) => {
- 
+
     var arr = dataurl.split(','),
         mime = arr[0].match(/:(.*?);/)[1],
-        bstr = atob(arr[1]), 
-        n = bstr.length, 
+        bstr = atob(arr[1]),
+        n = bstr.length,
         u8arr = new Uint8Array(n);
-        
+
     while(n--){
         u8arr[n] = bstr.charCodeAt(n);
     }
-    
+
     return new File([u8arr], fileName, {type:mime});
 }
 
 
 
 
-captureBtn.addEventListener("click", async function() {             
+captureBtn.addEventListener("click", async function() {
     canvas.getContext('2d').drawImage(myFace, 0, 0, canvas.width, canvas.height);
     let image_data_url = canvas.toDataURL('image/jpeg');
-    var file = dataURLtoFile(image_data_url,'capture.jpg');
+    var file = dataURLtoFile(image_data_url, 'capture.jpg');
     Promise.all([
         socket.emit("capture", file),
-        faceapi.nets.faceRecognitionNet.loadFromUri('js/home/models'), 
-        faceapi.nets.ssdMobilenetv1.loadFromUri('js/home/models'), 
+        faceapi.nets.faceRecognitionNet.loadFromUri('js/home/models'),
+        faceapi.nets.ssgitdMobilenetv1.loadFromUri('js/home/models'),
         faceapi.nets.faceLandmark68Net.loadFromUri('js/home/models'),
-        ])
-    .then(start)
+    ])
+        .then(start)
+
     async function start() {
         let image = await faceapi.fetchImage('capture/'+schoolid+' '+nickname+'.jpg')
         const labeledFaceDescriptors = await loadLabeledImages()
         const faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.45)
         console.log("Model Loaded")
         const singleResult = await faceapi
-        .detectSingleFace(image)
-        .withFaceLandmarks()
-        .withFaceDescriptor()
+            .detectSingleFace(image)
+            .withFaceLandmarks()
+            .withFaceDescriptor()
         if (singleResult) {
             const bestMatch = faceMatcher.findBestMatch(singleResult.descriptor)
             if (bestMatch.label=="Junseo")              //유동적으로 바뀌게 수정해야함
                 alert("사진과 일치합니다.")
             else
                 alert("사진과 일치하지 않습니다.")
-        }
-        else{
+        } else {
             alert("얼굴이 감지되지 않습니다. 다시 한번 캡처해주세요.")
         }
     }
+
     function loadLabeledImages() {
         const labels = ["Junseo"]
         return Promise.all(
-        labels.map(async label => {
-            const descriptions = []
-            for (let i = 1; i <= 2; i++) {
-            const img = await faceapi.fetchImage(`js/home/models/${i}.png`);
-            const detections = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor()
-            descriptions.push(detections.descriptor)
-            }
-            return new faceapi.LabeledFaceDescriptors(label, descriptions)
-        })
+            labels.map(async label => {
+                    const descriptions = []
+                    let img = await faceapi.fetchImage(path1); //회원가입했을때사진
+                    let detections = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor()
+                    descriptions.push(detections.descriptor)
+                    img = await faceapi.fetchImage(path2); //회원가입했을때사진
+                    detections = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor()
+                    descriptions.push(detections.descriptor)
+                    return new faceapi.LabeledFaceDescriptors(label, descriptions)
+                }
+            )
         )
     }
 });
-
-
-
 
 
 // 카메라 변환
@@ -222,7 +224,7 @@ async function initCall() {
     call.hidden = false;
     await getMedia();
 }
-  
+
 
 
 async function handleWelcomeSubmit(event) {
@@ -253,7 +255,7 @@ async function leaveRoom(){
     myStream.getTracks().forEach((track) => track.stop());
     const nicknameContainer = document.querySelector("#userNickname");
     nicknameContainer.innerText = "";
-    
+
     myFace.srcObject = null;
     await clearAllVideos();
     await clearAllChat();
@@ -290,10 +292,17 @@ leaveBtn.addEventListener("click", leaveRoom);
 
 // Socket Code
 
-socket.on("info", async(myId, myNickname, myAuth) => {
+socket.on("info", async(myId, myNickname, myAuth, myPath1, myPath2) => {
     schoolid = myId;
     nickname = myNickname;
     auth = myAuth;
+    path1 = myPath1;
+    path2 = myPath2;
+    path1 = path1.replace(/\\/g, '/');
+    path2 = path2.replace(/\\/g, '/');
+    path1 = path1.substr(11);
+    path2 = path2.substr(11);
+
     const nicknameContainer = document.querySelector("#userNickname");
     nicknameContainer.innerText = nickname;
 });
@@ -350,7 +359,7 @@ socket.on("leave_room", (leaveSocktId, nickname) => {
     removeVideo(leaveSocktId);
     writeChat(`${nickname} leaved the room`);
     --peopleInRoom;
-    
+
 })
 
 socket.on("room_change", (rooms, roomCount) => {
@@ -407,14 +416,14 @@ function makeConnection(remoteSocketId, remoteNickname, remoteAuth) {
           .forEach((track) => myPeerConnection.addTrack(track, myStream));
     }
 
-    
+
     pcObj[remoteSocketId] = myPeerConnection;
 
     ++peopleInRoom;
     return myPeerConnection;
 }
-  
-  
+
+
 function handleIce(event, remoteSocketId){
     if (event.candidate){
         socket.emit("ice", event.candidate, remoteSocketId);
@@ -439,7 +448,7 @@ function paintPeerFace(peerStream, id, remoteNickname){
     const nicknameContainer = document.createElement("h3");
     nicknameContainer.id = "userNickname";
     nicknameContainer.innerText = remoteNickname;
-    
+
     div.appendChild(video);
     div.appendChild(nicknameContainer);
     streams.appendChild(div);
